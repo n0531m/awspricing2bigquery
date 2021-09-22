@@ -1,0 +1,112 @@
+[{
+        "name": "sku",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "A unique code for a product. Use the SKU code to correlate product details and pricing. For example, a product with a SKU of HCNSHWWAJSGVAHMH is available only for a price that also lists HCNSHWWAJSGVAHMH as a SKU."
+    },
+    {
+        "name": "version",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "type",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "The specific type of term that a term definition describes. The valid term types are reserved and onDemand."
+    },
+    {
+        "name": "offerTermCode",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "A unique code for a specific type of term. For example, KCAKZHGHG. Product and price combinations are referenced by the SKU code followed by the term code, separated by a period. For example, U7ADXS4BEK5XXHRU.KCAKZHGHG."
+    },
+    {
+        "name": "effectiveDate",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": "The date that an offer file goes into effect. For example, if a term has an EffectiveDate of November 1, 2017, the price is not valid before November 1, 2017."
+    },
+    {
+        "name": "priceDimensions",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "description": "The pricing details for the offer file, such as how usage is measured, the currency that you can use to pay with, and the pricing tier limitations.",
+        "fields": [{
+                "name": "rateCode",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "A unique code for a product/offer/pricing-tier combination. Product and term combinations can have multiple price dimensions, such as a free tier, a low use tier, and a high use tier."
+            },
+            {
+                "name": "beginRange",
+                "type": "FLOAT",
+                "mode": "NULLABLE",
+                "description": "The lower limit of the price tier covered by this price. For example, 0 GB or 1,001 API calls."
+
+            },
+            {
+                "name": "endRange",
+                "type": "FLOAT",
+                "mode": "NULLABLE",
+                "description": "The upper limit of the price tier covered by this price. For example, 1,000 GB or 10,000 API calls."
+            },
+            {
+                "name": "unit",
+                "type": "STRING",
+                "mode": "NULLABLE",
+
+                "description": "The type of unit that each service uses to measure usage for billing. For example, EC2 uses hours as a measuring unit, and S3 uses GB as a measuring unit."
+            },
+            {
+                "name": "description",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "The description for a price or rate."
+            },
+            {
+                "name": "pricePerUnit",
+                "type": "RECORD",
+                "mode": "NULLABLE",
+                "description": "A calculation of how much a single measured unit for a service costs.",
+                "fields": [{
+                        "name": "USD",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE",
+                        "description": "The rate for a product in various supported currencies. For example, $1.2536 per unit."
+                    },
+                    {
+                        "name": "CNY",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE",
+                        "description": "The rate for a product in various supported currencies. For example, $1.2536 per unit."
+                    }
+                ]
+            },
+            {
+                "name": "appliesTo",
+                "type": "STRING",
+                "mode": "REPEATED"
+            }
+        ]
+    },
+    {
+        "name": "termAttributes",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "description": "A list all of the attributes that are applicable to a term type, in the format attribute-name: attribute-value. For example, length of term and type of purchase covered by the term.",
+        "fields": [{
+                "name": "key",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "The name of a TermAttribute. You can use it to look up specific attributes. For example, you can look up terms by length or PurchaseOption."
+            },
+            {
+                "name": "value",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "The value of a TermAttribute. For example, terms can have a length of one year and a purchase option of All Upfront."
+            }
+        ]
+    }
+]

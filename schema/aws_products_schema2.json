@@ -1,0 +1,64 @@
+[{
+        "name": "productFamily",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "The category for the type of product. For example, compute for Amazon EC2 or storage for Amazon S3."
+    },
+    {
+        "name": "servicecode",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "A unique code for the product of an AWS service. For example, AmazonEC2 for Amazon EC2 or AmazonS3 for Amazon S3."
+    },
+    {
+        "name": "servicename",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "sku",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "A unique code for a product. Use the SKU code to correlate product details and pricing. For example, a product with a SKU of HCNSHWWAJSGVAHMH is available only for a price that also lists HCNSHWWAJSGVAHMH as a SKU."
+    },
+    {
+        "name": "version",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "An attribute that tracks the version of the offer file. Each time a new file is published, it contains a new version number. For example, 20150409T022205 and 20150910T182105."
+    },
+    {
+        "name": "locationType",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "location",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "usagetype",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "attributes",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "description": "A list of all of the product attributes.",
+        "fields": [{
+                "name": "key",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "The name of a product attribute. For example, Instance Type, Processor, or OS."
+            },
+            {
+                "name": "value",
+                "type": "STRING",
+                "mode": "NULLABLE",
+                "description": "The value of a product attribute. For example, m1.small (an instance type), xen (a type of processor), or Linux (a type of OS)."
+            }
+        ]
+    }
+]
