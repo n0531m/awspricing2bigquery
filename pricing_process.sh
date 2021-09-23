@@ -161,23 +161,8 @@ function mergestaging2main {
     ON  T.sku = S.sku
     AND T.version = S.version
     and T.offerTermCode=S.offerTermCode
-    WHEN MATCHED THEN update
-    set 
-      T.sku = S.sku, 
-      T.version= S.version, 
-      T.type = S.type , 
-      T.offerTermCode = S.offerTermCode , 
-      T.effectiveDate = S.effectiveDate , 
-      T.priceDimensions = S.priceDimensions , 
-      T.termAttributes = S.termAttributes , 
-      T.productFamily = S.productFamily , 
-      T.servicecode = S.servicecode , 
-      T.servicename = S.servicename , 
-      T.locationType = S.locationType , 
-      T.location = S.location , 
-      T.usagetype = S.usagetype , 
-      T.attributes = S.attributes 
-    WHEN NOT MATCHED THEN INSERT ROW
+
+    WHEN NOT MATCHED BY TARGET THEN INSERT ROW
 EOF
   cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" query --nouse_legacy_sql
 }
@@ -219,3 +204,22 @@ function recreateOfferTable {
 #       T.attributes = S.attributes 
 #       WHEN NOT MATCHED THEN INSERT ROW
 
+
+
+
+    # WHEN MATCHED THEN update
+    # set 
+    #   T.sku = S.sku, 
+    #   T.version= S.version, 
+    #   T.type = S.type , 
+    #   T.offerTermCode = S.offerTermCode , 
+    #   T.effectiveDate = S.effectiveDate , 
+    #   T.priceDimensions = S.priceDimensions , 
+    #   T.termAttributes = S.termAttributes , 
+    #   T.productFamily = S.productFamily , 
+    #   T.servicecode = S.servicecode , 
+    #   T.servicename = S.servicename , 
+    #   T.locationType = S.locationType , 
+    #   T.location = S.location , 
+    #   T.usagetype = S.usagetype , 
+    #   T.attributes = S.attributes 

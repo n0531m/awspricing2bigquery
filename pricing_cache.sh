@@ -182,15 +182,21 @@ function pullAwsCurrents {
   done | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
 }
 
-function pullAwsOfferCurrent {
-  local AWS_OFFER=$1
-  pullAwsOfferVersion ${AWS_OFFER} current
-}
+#function pullAwsOfferCurrent {
+#  local AWS_OFFER=$1
+#  pullAwsOfferVersion ${AWS_OFFER} current#
+#}
+
 function pullAwsOfferVersion {
   local AWS_OFFER=$1
-  local VERSION=$2
-  if [[ "$#" != 2 ]]; then
-    echo "pullAwsOfferVersion : Illegal number of parameters"; return
+  local VERSION=current
+  if [[ "$#" == 0 ]]; then
+     echo "pullAwsOfferVersion : Illegal number ($#) of parameters" ; return
+
+  elif [[ "$#" == 2 ]]; then
+      VERSION=$2
+  elif [[ "$#" -gt 2 ]]; then
+      echo "pullAwsOfferVersion : Illegal number (\"$#\") of parameters" ; return
   fi
   cacheAndValidate "${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/${VERSION}/index.json"
 }

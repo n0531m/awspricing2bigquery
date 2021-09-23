@@ -125,7 +125,7 @@ X-Amz-Cf-Id: xs-jk6RzjGw_88xGqGuOqa7fgJeIDqccg5K-ppMV4tfjF3Ye2c8xVA==
 Age: 24
 ```
 
-now it's down to 150MB. it might be worth taking this subset, if your interest can be scoped down, or you have limitation in compute/storage capacity, which will not be the case for me. so will plan to use the whole.
+now it's down to 150MB. it might be worth taking this subset, if your interest can be scoped down, or you have limitation in compute/storage capacity.
 
 #### versionIndexUrl
 
@@ -137,7 +137,7 @@ Some files (like the one for EC2 mentioned above) are so big, that you don't wan
 
 This is what the versionIndex file can look like
 
-```text
+```bash
 $ curl -s ${ENDPOINT%/offers*}/offers/v1.0/aws/AmazonEC2/index.json | head -n 15
 {
   "formatVersion" : "v1.0",
@@ -310,3 +310,8 @@ Environments :
 ## scripts
 
 UNDER CONSTRUCTION
+
+for now :
+```
+main.sh usage
+```
