@@ -13,18 +13,20 @@ export DIR_CACHE=./cache
 export DIR_PROCESSED=./processed
 export DIR_HEADERS=./headers
 export DIR_SQL=./sql
+export DIR_ARTIFACTS=./artifacts
 export DIR_TEMP=./temp
 
-  if [ ! -d ${DIR_SCHEMA}    ] ; then mkdir -p ${DIR_SCHEMA}     ; fi
-  if [ ! -d ${DIR_CACHE}     ] ; then mkdir -p ${DIR_CACHE}      ; fi
-  if [ ! -d ${DIR_PROCESSED} ] ; then mkdir -p ${DIR_PROCESSED}  ; fi
-  if [ ! -d ${DIR_HEADERS}   ] ; then mkdir -p ${DIR_HEADERS}    ; fi
-  if [ ! -d ${DIR_SQL}       ] ; then mkdir -p ${DIR_SQL}        ; fi
-  if [ ! -d ${DIR_TEMP}      ] ; then mkdir -p ${DIR_TEMP}       ; fi
+if [ ! -d ${DIR_SCHEMA}     ] ; then mkdir -p ${DIR_SCHEMA}     ; fi
+if [ ! -d ${DIR_CACHE}      ] ; then mkdir -p ${DIR_CACHE}      ; fi
+if [ ! -d ${DIR_PROCESSED}  ] ; then mkdir -p ${DIR_PROCESSED}  ; fi
+if [ ! -d ${DIR_HEADERS}    ] ; then mkdir -p ${DIR_HEADERS}    ; fi
+if [ ! -d ${DIR_SQL}        ] ; then mkdir -p ${DIR_SQL}        ; fi
+if [ ! -d ${DIR_ARTIFACTS}  ] ; then mkdir -p ${DIR_ARTIFACTS}  ; fi
+if [ ! -d ${DIR_TEMP}       ] ; then mkdir -p ${DIR_TEMP}       ; fi
 
 
 DIR_OUT_CONCAT=${DIR_PROCESSED}/concat
-if [ ! -d ${DIR_OUT_CONCAT}  ] ; then mkdir -p ${DIR_OUT_CONCAT} ; fi
+if [ ! -d ${DIR_OUT_CONCAT} ] ; then mkdir -p ${DIR_OUT_CONCAT} ; fi
 
 
 #### Data source (AWS) related
@@ -51,6 +53,65 @@ BQ_PROJECT=${GCP_PROJECTNAME}
 BQ_DATASET=aws_pricing
 BQ_DATASET_STAGING=aws_pricing_staging
 BQ_TABLE_PREFIX=aws_offers
+
+
+#### GCP Transfer service
+
+
+
+#### main
+
+## usage to be implemented
+
+function usage {
+  echo usage :
+
+  echo $0 cacheRefreshMasterIndex
+  echo $0 clearCache
+  echo $0 clearHeaders
+  echo $0 pullAwsOfferVersion
+  echo $0 pullAwsCurrents
+  echo $0 pullAwsLatests
+  echo $0 pullAwsVersionIndexes
+  echo $0 pullAwsVersionIndexesFull
+  echo $0 pullAwsSavingsPlanVersionIndexes
+  echo $0 pullAwsOfferCurrent "<OFFER>"
+  echo $0 pullAwsOfferVersion "<OFFER>" "<VERSION>"
+
+  echo $0 processAndLoadCurrentAll
+  echo $0 processAndLoadOffer "<OFFER>"
+  echo $0 processAndLoadOfferVersion "<OFFER>" "<VERSION>"
+  echo $0 mergestaging2main
+  echo $0 createOfferTable
+  echo $0 recreateOfferTable
+
+  echo $0 cacheAndValidate "<URL>"
+  
+  echo $0 createAwsCurrentVersionsDownloadlist
+  echo $0 createAwsLatestPricingDownloadlist
+  echo $0 createAwsFullVersionIndexDownloadTsv
+
+  # echo $0 cache clear
+  # echo $0 cache clear "<OFFER>"
+  # echo $0 cache clear "<OFFER>" "<VERSION>"
+  # echo $0 cache refresh 
+  # echo $0 cache refresh versionIndexes
+  # echo $0 cache refresh "<OFFER>"
+  # echo $0 cache refresh "<OFFER>" "<VERSION>"
+
+  # echo $0 process
+  # echo $0 process "<OFFER>"
+  # echo $0 process "<OFFER>" "<VERSION>"
+
+  # echo $0 bq staging recreate
+  # echo $0 bq staging show
+  # echo $0 bq prod recreate
+  # echo $0 bq prod show
+}
+
+"$@"
+
+
 
 
 

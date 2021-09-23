@@ -37,12 +37,22 @@ function cacheHeaderByUrl {
   local FILE_HEADER_DIR=${FILE_HEADER%/*}
 
   if [ ! -d "${FILE_HEADER_DIR}" ] ; then mkdir -p "${FILE_HEADER_DIR}" ; fi
-  curl -s -I $URL > ${FILE_HEADER}
+
+  curl -s -I $URL > ${FILE_HEADER} 
+  if [ ! -s ${FILE_HEADER} ] ; then 
+    sleep 2;  curl -s -I $URL > ${FILE_HEADER} 
+    if [ ! -s ${FILE_HEADER} ] ; then 
+      sleep 4;  curl -s -I $URL > ${FILE_HEADER} 
+      if [ ! -s "${FILE_HEADER}" ] ; then 
+          echo "failed to fetch header for $URL"
+      fi
+    fi
+  fi
 }
 export -f cacheHeaderByUrl
 
 ## capture index file 
-function refreshAwsVersionIndexes {
+function pullAwsVersionIndexes {
   
   cacheRefreshMasterIndex
   
@@ -99,13 +109,13 @@ function cacheAndValidate {
 #  local DIR_CACHE=./cache
 
 #  if [ ! -d ${DIR_HEADER} ] ; then mkdir -p ${DIR_HEADER} ; fi
-    echo cacheAndValidate URL:${URL}
+  #  echo cacheAndValidate URL:${URL}
 
   local FILE=${DIR_CACHE}/${URL#https://}
-    echo cacheAndValidate FILE:${FILE}
+  #  echo cacheAndValidate FILE:${FILE}
 
   local FILE_HEADER=${DIR_HEADERS}/${URL#https://}
-  echo cacheAndValidate FILE_HEADER:${FILE_HEADER}
+  #echo cacheAndValidate FILE_HEADER:${FILE_HEADER}
   #FILE_HEADER=${FILE_HEADER%/.*}.txt
 
 #  local FILE_HEADER_DIR=${FILE_HEADER%/*}
@@ -115,17 +125,8 @@ function cacheAndValidate {
   ## fetch header with exponential backoff
   cacheHeaderByUrl "${URL}" 
   if [ ! -s "${FILE_HEADER}" ] ; then 
-    sleep 2 ;  cacheHeaderByUrl "${URL}"
-    if [ ! -s "${FILE_HEADER}" ] ; then 
-      sleep 4 ; cacheHeaderByUrl "${URL}"
-      if [ ! -s "${FILE_HEADER}" ] ; then 
-        sleep 8 ; cacheHeaderByUrl "${URL}"
-        if [ ! -s "${FILE_HEADER}" ] ; then 
-           echo "failed to fetch header for $URL"
-           echo "cannot validate with empty header $FILE_HEADER"
-        fi
-      fi
-    fi
+      echo "failed to fetch header for $URL"
+      echo "cannot validate with empty header $FILE_HEADER"
   fi
 
   if [ ! -s "${FILE_HEADER}" ] ; then echo cannot validate with empty "${FILE_HEADER}" ; fi
@@ -172,7 +173,7 @@ export -f cacheAndValidate
 ## capture index file 
 function pullAwsCurrents {
 
-  refreshMasterIndex
+  cacheRefreshMasterIndex
 
   ## for each service, download their own version index file
   for AWS_OFFER in $(cat $LOCAL_INDEX | jq -r '.offers[] | .offerCode' | sort)
@@ -197,7 +198,7 @@ function pullAwsOfferVersion {
 
 function pullAwsLatests {
 
-  refreshMasterIndex
+  cacheRefreshMasterIndex
   
   ## for each service, download their own version index file
   
@@ -206,6 +207,7 @@ function pullAwsLatests {
     local VERSIONINDEX_URL=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json
     local VERSIONINDEX_LOCAL=${DIR_CACHE}/${VERSIONINDEX_URL#https://}
     #echo $VERSIONINDEX_LOCAL >&2
+    ## cat ./cache/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/translate/index.json | jq ' .currentVersion as $V | .versions[$V].offerVersionUrl'
     cat $VERSIONINDEX_LOCAL | jq -r --arg prefix "$AWS_FEEDURL_PREFIX" '.versions[] | $prefix + .offerVersionUrl' | sort -r | head -n 1
   done | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
   #wget -q -P ${DIR_CACHE} -c -x

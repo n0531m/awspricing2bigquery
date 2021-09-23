@@ -57,27 +57,37 @@ function createAwsLatestPricingDownloadlist {
   done > ${FILE_OUTPUT}
 }
 
+function cacheHeadersFullVersionIndex {
+  cat $LOCAL_INDEX \
+  | jq --arg prefix ${AWS_FEEDURL_PREFIX} -r '.offers[] | $prefix+"/offers/v1.0/aws/"+.offerCode+"/index.json"' \
+  | xargs -n 2 -P 0 -I {} curl -s {} \
+  | jq --arg prefix ${AWS_FEEDURL_PREFIX} -r '.versions[] | $prefix+.offerVersionUrl' \
+  | xargs -n 2 -P 0 -I {} bash -c "cacheHeaderByUrl {}" 
+}
 function createAwsFullVersionIndexDownloadTsv {
   #https://cloud.google.com/storage-transfer/docs/create-url-list
-  local FILE_OUTPUT=./artifacts/fullVersionIndexlist.tsv
+  local FILE_OUTPUT=${DIR_ARTIFACTS}/fullVersionIndexlist.tsv
+    
+  cacheHeadersFullVersionIndex
   
-  echo TsvHttpData-1.0 > $FILE_OUTPUT
-  local FILE_CACHE=cached_index.json
-  local AWS_FEEDURL_PREFIX=https://pricing.us-east-1.amazonaws.com
-  wget -q -P ./indexes -c -x ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/index.json
-  wget -q -O $FILE_CACHE -c ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/index.json
-  for AWS_OFFER in $(cat $FILE_CACHE | jq -r '.offers[] | .offerCode' | sort)
+  echo TsvHttpData-1.0 > "$FILE_OUTPUT"
+
+  for AWS_OFFER in $(cat "$LOCAL_INDEX" | jq -r '.offers[] | .offerCode' | sort)
   do 
     for offerVersionUrl in $(curl -s "${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json" | jq -r .versions[].offerVersionUrl)
     do
       ## Content-Length
-      local CLEN=$(curl -s -I "${AWS_FEEDURL_PREFIX}${offerVersionUrl}" | grep Content-Length | cut -f 2 -d " " | tr -d "\r\n")
-      ## ETag (hex --> binary --> Base64)
-      local ETag=$(curl -s -I "${AWS_FEEDURL_PREFIX}${offerVersionUrl}" | grep ETag | cut -f 2 -d " " | tr -d "\"" | xxd -r -p | base64)
-      echo -e "${AWS_FEEDURL_PREFIX}${offerVersionUrl}\t${CLEN}\t${ETag}"
+      local URL="${AWS_FEEDURL_PREFIX}${offerVersionUrl}"
+      #cacheHeaderByUrl $URL
+      local FILE_HEADER=${DIR_HEADERS}/${URL#https://}
+      if [ -s "$FILE_HEADER" ] ; then
+        local CLEN=$(cat "${FILE_HEADER}" | grep Content-Length | cut -f 2 -d " " | tr -d "\r\n")
+        ## ETag (hex --> binary --> Base64)
+        local ETag=$(cat "${FILE_HEADER}" | grep ETag | cut -f 2 -d " " | tr -d "\"" | xxd -r -p | base64)
+        echo -e "${AWS_FEEDURL_PREFIX}${offerVersionUrl}\t${CLEN}\t${ETag}"
+      fi
     done
-  done 
-  #| sort >> $FILE_OUTPUT
+  done | sort >> $FILE_OUTPUT
 
   #gsutil cp -c $FILE_OUTPUT gs://moritani-pricebook-transferservice-sink-asia/lists/fullVersionIndexlist_sorted.txt
 }
