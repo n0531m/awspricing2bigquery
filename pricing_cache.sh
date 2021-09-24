@@ -24,9 +24,17 @@ function cacheContentByUrl {
   local FILE=${DIR_CACHE}/${URL#https://}
   #echo cacheContentByUrl $URL
   #echo cacheContentByUrl $FILE
-  #wget -q -P ${DIR_CACHE} -x ${URL} && echo "${URL} : cached
   
-  curl -s -C - --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
+  wget -N -q -P ${DIR_CACHE} -x ${URL} && echo "${URL} : cached"
+  #curl -s --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
+#  curl -s -C - --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
+  if [ ! -s ${FILE} ] ; then 
+    sleep 2;  wget -N -q -P ${DIR_CACHE} -x ${URL} && echo "${URL} : cached"
+    #sleep 2;  curl -s --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
+    if [ ! -s "${FILE}" ] ; then 
+        echo "failed to fetch header for $URL"
+    fi
+  fi
 }
 export -f cacheContentByUrl
 
@@ -86,7 +94,6 @@ function pullAwsSavingsPlanVersionIndexes {
       done
     done
   done | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
-  #| xargs -n 2 -P 0 wget -q -P ${DIR_CACHE} -c -x
 
 }
 
@@ -105,22 +112,12 @@ function pullAwsVersionIndexesFull {
 function cacheAndValidate {
   local URL=$1
   #echo \#downloadAndValidateUrl ${URL}
-#  local DIR_HEADER=./header
-#  local DIR_CACHE=./cache
-
-#  if [ ! -d ${DIR_HEADER} ] ; then mkdir -p ${DIR_HEADER} ; fi
-  #  echo cacheAndValidate URL:${URL}
 
   local FILE=${DIR_CACHE}/${URL#https://}
   #  echo cacheAndValidate FILE:${FILE}
 
   local FILE_HEADER=${DIR_HEADERS}/${URL#https://}
   #echo cacheAndValidate FILE_HEADER:${FILE_HEADER}
-  #FILE_HEADER=${FILE_HEADER%/.*}.txt
-
-#  local FILE_HEADER_DIR=${FILE_HEADER%/*}
-#  if [ ! -d ${FILE_HEADER_DIR} ] ; then mkdir -p ${FILE_HEADER_DIR} ; fi
-
 
   ## fetch header with exponential backoff
   cacheHeaderByUrl "${URL}" 
@@ -137,62 +134,52 @@ function cacheAndValidate {
   #echo header.ETag : $ETag
     
   if [ ! -f $FILE ] ; then
-    #echo $FILE does not exist
-    #wget -q -P ${DIR_CACHE} -x ${URL}  && echo ${URL} cached
     cacheContentByUrl "${URL}"
-    #echo $FILE
-    local size=$(stat -f "%z" $FILE)
-    #echo size:$size
-    local local_md5=$(md5 -q $FILE | tr -d "\"\r\n")
-    #echo local_md5:$local_md5    
-    if [ ! $size -eq ${CLEN} ] ; then
-      rm $FILE ; echo file size does not match. deleting fetched file $FILE
-    elif [[ ! ${local_md5} == ${ETag} ]] ; then
-      rm $FILE ; echo file md5 hash does not match. deleting fetched file $FILE
-    fi
-
-  else
-    #echo $FILE already exist
-    local size=$(stat -f "%z" $FILE)
-    local local_md5=$(md5 -q $FILE | tr -d "\"\r\n")
-    
-    if [[ ! $size -eq ${CLEN} ]] ; then
-      echo "file size does not match re-download. actual : $size , expected : $CLEN"
-      echo ${URL}
-      echo ${FILE_HEADER}
-      cacheContentByUrl "${URL}"
-    elif [[ ! ${local_md5} == ${ETag} ]] ; then
-      echo "file md5 hash does not match ETag. re-download"
-      echo ${URL}
-      cacheContentByUrl "${URL}"
-    fi
+  fi
+  local size=$(stat -f "%z" $FILE)
+  local local_md5=$(md5 -q $FILE | tr -d "\"\r\n")
+  
+  if [[ ! $size -eq ${CLEN} ]] ; then
+    echo "cacheAndValidate : file size does not match expected. actual : $size , expected : $CLEN. re-download"
+    echo ${URL}
+    rm $FILE
+    cacheContentByUrl "${URL}"
+  elif [[ ! ${local_md5} == ${ETag} ]] ; then
+    echo "cacheAndValidate : file md5 hash does not match ETag. actual : ${local_md5}, expected : ${ETag}. re-download"
+    echo ${URL}
+    #curl -I ${URL}
+    rm $FILE
+    cacheContentByUrl "${URL}"
   fi
 }
 export -f cacheAndValidate
 
 ## capture index file 
-function pullAwsCurrents {
-
+function pullCurrentOffers {
   cacheRefreshMasterIndex
 
   ## for each service, download their own version index file
-  for AWS_OFFER in $(cat $LOCAL_INDEX | jq -r '.offers[] | .offerCode' | sort)
-  do 
-    echo ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/current/index.json
-  done | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
+  cat $LOCAL_INDEX \
+  | jq -r --arg prefix ${AWS_FEEDURL_PREFIX} '.offers[] | $prefix+"/offers/v1.0/aws/"+.offerCode+"/current/index.json"' \
+  | xargs -n 2 -P 0 -I {}  bash -c "cacheAndValidate {}"
 }
 
-#function pullAwsOfferCurrent {
-#  local AWS_OFFER=$1
-#  pullAwsOfferVersion ${AWS_OFFER} current#
-#}
+function pullLatestOffers {
+
+  cacheRefreshMasterIndex
+  
+  ## for each service, download their own version index file  
+  cat $LOCAL_INDEX \
+  | jq -r --arg prefix ${DIR_CACHE}/${AWS_FEEDURL_PREFIX#https://} '.offers[] | $prefix+"/offers/v1.0/aws/"+.offerCode+"/index.json"' \
+  | xargs -n 2 -P 0 -I {}  cat {} | jq -r  --arg prefix ${AWS_FEEDURL_PREFIX} '.currentVersion as $ver | .versions[$ver] | $prefix+.offerVersionUrl' \
+  | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
+}
 
 function pullAwsOfferVersion {
   local AWS_OFFER=$1
   local VERSION=current
   if [[ "$#" == 0 ]]; then
      echo "pullAwsOfferVersion : Illegal number ($#) of parameters" ; return
-
   elif [[ "$#" == 2 ]]; then
       VERSION=$2
   elif [[ "$#" -gt 2 ]]; then
@@ -202,22 +189,6 @@ function pullAwsOfferVersion {
 }
 
 
-function pullAwsLatests {
-
-  cacheRefreshMasterIndex
-  
-  ## for each service, download their own version index file
-  
-  for AWS_OFFER in $(cat $LOCAL_INDEX | jq -r  '.offers[] | .offerCode' | sort)
-  do 
-    local VERSIONINDEX_URL=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json
-    local VERSIONINDEX_LOCAL=${DIR_CACHE}/${VERSIONINDEX_URL#https://}
-    #echo $VERSIONINDEX_LOCAL >&2
-    ## cat ./cache/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/translate/index.json | jq ' .currentVersion as $V | .versions[$V].offerVersionUrl'
-    cat $VERSIONINDEX_LOCAL | jq -r --arg prefix "$AWS_FEEDURL_PREFIX" '.versions[] | $prefix + .offerVersionUrl' | sort -r | head -n 1
-  done | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
-  #wget -q -P ${DIR_CACHE} -c -x
-}
 
 function pushAwsCache2GCS {
   gsutil -m -o GSUtil:parallel_process_count=1 rsync -r -J ./cache gs://moritani-pricebook-transferservice-sink-asia/

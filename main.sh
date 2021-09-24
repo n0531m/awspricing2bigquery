@@ -57,6 +57,7 @@ BQ_TABLE_PREFIX=aws_offers
 
 #### GCP Transfer service
 
+BUCKET_STS_SINK=
 
 
 #### main
@@ -69,14 +70,13 @@ function usage {
   echo $0 cacheRefreshMasterIndex
   echo $0 clearCache
   echo $0 clearHeaders
-  echo $0 pullAwsOfferVersion
-  echo $0 pullAwsCurrents
-  echo $0 pullAwsLatests
   echo $0 pullAwsVersionIndexes
   echo $0 pullAwsVersionIndexesFull
   echo $0 pullAwsSavingsPlanVersionIndexes
-  echo $0 pullAwsOfferCurrent "<OFFER>"
+  echo $0 pullAwsOfferVersion "<OFFER>"
   echo $0 pullAwsOfferVersion "<OFFER>" "<VERSION>"
+  echo $0 pullCurrentOffers
+  echo $0 pullLatestOffers
 
   echo $0 processAndLoadCurrentAll
   echo $0 processAndLoadOffer "<OFFER>"
