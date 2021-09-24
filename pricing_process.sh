@@ -6,9 +6,8 @@ function preprocessOfferdata {
     if [[ "$#" != 2 ]]; then
       echo "preprocessOfferdata : Illegal number of parameters"; return
     fi
-    local OFFERVERSION_AWS=https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/$AWS_OFFER/$VERSION/index.json
+    local OFFERVERSION_AWS=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/$AWS_OFFER/$VERSION/index.json
     local OFFERVERSION_LOCAL=${DIR_CACHE}/${OFFERVERSION_AWS#https://}
-    local OFFERVERSION_LOCAL_DIR=${OFFERVERSION_LOCAL%/*}
     local OFFERVERSION_PROCESSED=${DIR_PROCESSED}/${OFFERVERSION_AWS#https://}
     local OFFERVERSION_PROCESSED_DIR=${OFFERVERSION_PROCESSED%/*}
 
@@ -21,25 +20,13 @@ function preprocessOfferdata {
 
     VERSION=$(cat "$OFFERVERSION_LOCAL" | jq -e -r .version ) || echo jq error "$OFFERVERSION_LOCAL"
 
-    #echo "VERSION : $VERSION"
-
     if [ ! -e $$OFFERVERSION_LOCAL ]; then
-
-
-        # cat $OFFERVERSION_LOCAL \
-        #     | jq -S -c ".version as \$VER | .products[] | .sku as \$sku | .productFamily as \$productFamily | .attributes | .sku=\$sku | .productFamily=\$productFamily | .version=\$VER" \
-        #     > ${OFFERVERSION_PROCSSED_DIR}/products.jsonl
         
         if [ ! -f "${OFFERVERSION_PROCESSED_DIR}/products2.jsonl" ]; then
           cat "$OFFERVERSION_LOCAL" \
               | jq -S -c ".version as \$VER | .products[] | .version=\$VER | .usagetype=.attributes.usagetype | .servicecode=.attributes.servicecode | .servicename=.attributes.servicename |  .location=.attributes.location |  .locationType=.attributes.locationType| del(.attributes.servicename, .attributes.servicecode, .attributes.usagetype, .attributes.location, .attributes.locationType) | .attributes=[(.attributes | to_entries[] | {key:.key, value:.value})] " \
               > "${OFFERVERSION_PROCESSED_DIR}/products2.jsonl"
         fi
-        # cat $OFFERVERSION_LOCAL \
-        #     | jq -S -c ".version as \$VER | .terms | to_entries[] | .key as \$type | .value[] | .[] | . as \$offerterm | .priceDimensions | {priceDimensions:[values[]]} | .sku=\$offerterm.sku | .offerTermCode=\$offerterm.offerTermCode | .effectiveDate=\$offerterm.effectiveDate | .termAttributes=\$offerterm.termAttributes | .type=\$type | .version=\$VER" \
-        #     | jq -S -c --slurp "group_by(.sku)[] | {sku:(.[0].sku), terms:.} | del(.terms[].sku)" \
-        #     | jq -S -c ".sku as \$sku | .terms[] | .sku=\$sku | if .termAttributes == {} then del(.termAttributes) else . end" \
-        #     > ${OFFERVERSION_PROCSSED_DIR}/terms.jsonl
 
         if [ ! -f "${OFFERVERSION_PROCESSED_DIR}/terms2.jsonl" ]; then
           cat "$OFFERVERSION_LOCAL" \
@@ -80,17 +67,20 @@ function _concatOfferFiles {
   done > ${DIR_OUT_CONCAT}/aws_terms.jsonl
 }
 
-function processAndLoadOffer {
-  local OFFER=$1
-  processAndLoadOfferVersion $OFFER current
-}
 function processAndLoadOfferVersion {
   local AWS_OFFER=$1
-  local VERSION=$2
+  local VERSION=current
 
-  if [[ "$#" != 2 ]]; then
-    echo "processAndLoadOfferVersion : Illegal number of parameters"; return
+  if [[ "$#" == 0 ]]; then
+     echo "processAndLoadOfferVersion : Illegal number ($#) of parameters" ; return
+  elif [[ "$#" == 2 ]]; then
+      VERSION=$2
+  elif [[ "$#" -gt 2 ]]; then
+      echo "processAndLoadOfferVersion : Illegal number ($#) of parameters" ; return
   fi
+  #if [[ "$#" != 2 ]]; then
+  #  echo "processAndLoadOfferVersion : Illegal number of parameters"; return
+  #fi
 
   pullAwsOfferVersion $AWS_OFFER $VERSION
   preprocessOfferdata $AWS_OFFER $VERSION
@@ -152,7 +142,6 @@ EOF
 }
 
 function mergestaging2main {
-   
 
   local FILE_SQL=${DIR_SQL}/aws_offer_merge.sql
   cat > ${FILE_SQL} <<- EOF
@@ -166,6 +155,7 @@ function mergestaging2main {
 EOF
   cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" query --nouse_legacy_sql
 }
+
 function createOfferTable {
   bq --project_id ${BQ_PROJECT} \
     --dataset_id=${BQ_DATASET} \
@@ -181,45 +171,3 @@ function recreateOfferTable {
     rm -f ${BQ_DATASET}.${BQ_TABLE_PREFIX}
   createOfferTable
 }
-# MERGE INTO \`${BQ_PROJECT}.${BQ_DATASET}.${BQ_TABLE_PREFIX}\` T
-#     USING \`${BQ_PROJECT}.${BQ_DATASET_STAGING}.${BQ_TABLE_PREFIX}\` S
-#     ON  T.sku = S.sku
-#     AND T.version = S.version
-#     and T.offerTermCode=S.offerTermCode
-# WHEN MATCHED THEN update
-#     set 
-#       T.sku = S.sku, 
-#       T.version= S.version, 
-#       T.type = S.type , 
-#       T.offerTermCode = S.offerTermCode , 
-#       T.effectiveDate = S.effectiveDate , 
-#       T.priceDimensions = S.priceDimensions , 
-#       T.termAttributes = S.termAttributes , 
-#       T.productFamily = S.productFamily , 
-#       T.servicecode = S.servicecode , 
-#       T.servicename = S.servicename , 
-#       T.locationType = S.locationType , 
-#       T.location = S.location , 
-#       T.usagetype = S.usagetype , 
-#       T.attributes = S.attributes 
-#       WHEN NOT MATCHED THEN INSERT ROW
-
-
-
-
-    # WHEN MATCHED THEN update
-    # set 
-    #   T.sku = S.sku, 
-    #   T.version= S.version, 
-    #   T.type = S.type , 
-    #   T.offerTermCode = S.offerTermCode , 
-    #   T.effectiveDate = S.effectiveDate , 
-    #   T.priceDimensions = S.priceDimensions , 
-    #   T.termAttributes = S.termAttributes , 
-    #   T.productFamily = S.productFamily , 
-    #   T.servicecode = S.servicecode , 
-    #   T.servicename = S.servicename , 
-    #   T.locationType = S.locationType , 
-    #   T.location = S.location , 
-    #   T.usagetype = S.usagetype , 
-    #   T.attributes = S.attributes 

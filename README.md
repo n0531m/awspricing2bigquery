@@ -293,10 +293,12 @@ Capabilities required are :
 
 So will start with old school tools such as the followings, and see what might eventually be worth moving to proper serverless code.
 
-* curl/wget : I am a person that cannot choose one over the other. sometimes, wget still gives nice flexibility or flags that curl does not and vice-versa.
-* jq : my goto tool for scripting based json file manipulation
-* Cloud SDK : to do such things as "upload file to Cloud Storage", "load files into BigQuery", etc.
-* bash : quick scripting to automate certain sequenced execution of above.
+* `curl`/`wget` : I am a person that cannot choose one over the other. sometimes, wget still gives nice flexibility or flags that curl does not and vice-versa.
+* `jq` : my goto tool for scripting based json file manipulation
+* Cloud SDK (`bq`, `gsutil`, `gcloud`)  : to do such things as "upload file to Cloud Storage", "load files into BigQuery", etc.
+* `bash` : quick scripting to automate certain sequenced execution of above.
+* `xargs` : to make execution much faster than for-loops
+* `xxd`,`base64` : to decode/calculate ETag.
 
 I know I will be iterating my scripts over time, and I will need to exoplore files and make decision on what to do with it. For better user/developer experience, I will probably still need some amount locally. But that will be considered temp files and my main data storage will be on Google Cloud Storage, which will be a mirror of what is available from AWS.
 
@@ -307,11 +309,71 @@ Environments :
 * Local : for my convenience. technically, if running everything on a vm on the cloud or Cloud Shell, not needed. But I want to use editors of my choice so will still use this.
 
 
-## scripts
+## how to use
+
+### Config
+
+Change variables in `main.sh` to match your preference.
+
+### Directory/Folders
+
+Directories will be automatically created under the current working directory to store certain types of information. These can be changed to match your preference but not required to.
+
+* `DIR_CACHE` : downloaded files will be treated as cache and store under this directory. structure will be direct reflection of the URL.
+* `DIR_HEADERS` : HTTP Headers are also cached but in a separate directory. This is to efficiently fetch ETag or content size for verification, etc.
+* `DIR_PROCESSED` : output from local data processing is stored here and then pushed to the cloud.
+* `DIR_SQL` : SQL for joining or merging will be stored here so that it is easier to debug, should any failure happens.
+* `DIR_ARTIFACTS` : some of the outcomes that might be worth version controlling or useful to have without the necessity of large downloads are stored here.
+
+
+#### GCP Common
+
+The variables below will need to meet your GCP env.
+
+* `GCP_PROJECTNAME` : will automatically use what is set for your Cloud SDK, the output of `gcloud config list  --format="value(core.project)"`
+* `REGION` (default : `asia-southeast1` (Singapore)) : the GCP region to be used. resources below will be created in this region.
+
+#### Cloud Storage
+
+* `BUCKET` : staging bucket.
+* `BUCKET_WORK` : a bucket to be used to upload files to be loaded to BigQuery. can be the same as above.
+
+#### BigQuery
+
+* `BQ_PROJECT` (default : `<what is set to your Cloud SDK>` ): will default to the project set to Cloud SDK. sometimes you might want to have data loaded into BigQuery in another project, in which case you can set it here.
+* `BQ_DATASET` (default : `aws_pricing` ): the main dataset where the final outcome will be stored.
+* `BQ_DATASET_STAGING` (default : `aws_pricing_staging` ): data will be first loaded into the staging dataset, and then merged into the main dataset. thus, a separate dataset is needed. 
+* `BQ_TABLE_PREFIX` (default : `aws_offers` ): a common prefix that will be used for table names.
+
+
+## Usage
 
 UNDER CONSTRUCTION
 
-for now :
+```bash
+$ ./main.sh usage
+usage :
+./main.sh cacheRefreshMasterIndex
+./main.sh clearCache
+./main.sh clearHeaders
+./main.sh pullAwsVersionIndexes
+./main.sh pullAwsVersionIndexesFull
+./main.sh pullAwsSavingsPlanVersionIndexes
+./main.sh pullAwsOfferVersion <OFFER>
+./main.sh pullAwsOfferVersion <OFFER> <VERSION>
+./main.sh pullCurrentOffers
+./main.sh pullLatestOffers
+./main.sh preprocessOfferdata <OFFER> <VERSION>
+./main.sh processAndLoadCurrentAll
+./main.sh processAndLoadOfferVersion <OFFER>
+./main.sh processAndLoadOfferVersion <OFFER> <VERSION>
+./main.sh mergestaging2main
+./main.sh createOfferTable
+./main.sh recreateOfferTable
+./main.sh cacheAndValidate <URL>
+./main.sh createAwsOffersCurrentVersionUrlList
+./main.sh createAwsOffersLatestVersionUrlList
+./main.sh createAwsFullVersionIndexDownloadTsv
 ```
-main.sh usage
-```
+
+more details to be documented sometime....
