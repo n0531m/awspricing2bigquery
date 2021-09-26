@@ -121,35 +121,39 @@ function cacheAndValidate {
     
     ## fetch header with exponential backoff
     cacheHeaderByUrl "${URL}"
-    if [ ! -s "${FILE_HEADER}" ] ; then
-        echo "failed to fetch header for $URL"
-        echo "cannot validate with empty header $FILE_HEADER"
-    fi
-    
-    if [ ! -s "${FILE_HEADER}" ] ; then echo cannot validate with empty "${FILE_HEADER}" ; fi
-    
-    local CLEN=$(cat "${FILE_HEADER}" | grep Content-Length | cut -f 2 -d " " | tr -d "\r\n")
-    #echo header.Content-Length : $CLEN
-    local ETag=$(cat "${FILE_HEADER}" | grep ETag | cut -f 2 -d " " | tr -d "\"\r\n") # | xxd -r -p | base64
-  #echo header.ETag : $ETag
 
-  if [ ! -f $FILE ] ; then
-    cacheContentByUrl "${URL}"
-  fi
-  local size=$(stat -f "%z" "$FILE")
-  local local_md5=$(md5 -q "$FILE" | tr -d "\"\r\n")
-    
-  if [[ ! $size -eq ${CLEN} ]] ; then
-      echo "cacheAndValidate : file size does not match expected. actual : $size , expected : $CLEN. re-download"
-      echo "${URL}"
-      rm "$FILE"
-      cacheContentByUrl "${URL}"
-      elif [[ ! ${local_md5} == ${ETag} ]] ; then
-      echo "cacheAndValidate : file md5 hash does not match ETag. actual : ${local_md5}, expected : ${ETag}. re-download"
-      echo "${URL}"
-      #curl -I ${URL}
-      rm "$FILE"
-      cacheContentByUrl "${URL}"
+    if [ ! -s "${FILE_HEADER}" ] ; then
+        echo "failed to fetch header for $URL" >&2 
+        echo "cannot validate with empty header $FILE_HEADER" >&2
+        return
+    else
+        
+      local CLEN=$(cat "${FILE_HEADER}" | grep Content-Length | cut -f 2 -d " " | tr -d "\r\n")
+      #echo header.Content-Length : $CLEN
+      local ETag=$(cat "${FILE_HEADER}" | grep ETag | cut -f 2 -d " " | tr -d "\"\r\n") # | xxd -r -p | base64
+      #echo header.ETag : $ETag
+
+      if [ ! -f $FILE ] ; then
+        cacheContentByUrl "${URL}"
+      fi
+
+      if [ -f $FILE ] ; then
+        local size=$(stat -f "%z" "$FILE")
+        local local_md5=$(md5 -q "$FILE" | tr -d "\"\r\n")
+
+        if [[ ! $size -eq ${CLEN} ]] ; then
+          echo "cacheAndValidate : file size does not match expected. actual : $size , expected : $CLEN. re-download" >&2
+          echo "${URL}" >&2
+          rm "$FILE"
+          cacheContentByUrl "${URL}"
+          elif [[ ! ${local_md5} == ${ETag} ]] ; then
+          echo "cacheAndValidate : file md5 hash does not match ETag. actual : ${local_md5}, expected : ${ETag}. re-download" >&2
+          echo "${URL}" >&2
+          #curl -I ${URL}
+          rm "$FILE"
+          cacheContentByUrl "${URL}"
+        fi
+      fi
   fi
 }
 export -f cacheAndValidate
@@ -186,6 +190,68 @@ function pullAwsOfferVersion {
         echo "pullAwsOfferVersion : Illegal number (\"$#\") of parameters" ; return
     fi
     cacheAndValidate "${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/${VERSION}/index.json"
+}
+export -f pullAwsOfferVersion
+
+function listAwsOfferVersions {
+  local AWS_OFFER=$1
+  if [[ "$#" != 1 ]]; then
+    echo "listAwsOfferVersions : Illegal number ($#) of parameters"
+    echo -e "\tusage : listAwsOfferVersions <AWS_OFFER>" ; return
+  fi
+  cacheRefreshMasterIndex
+
+  URL_OFFERINDEX=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json
+  cacheAndValidate $URL_OFFERINDEX
+
+  FILE_OFFERINDEX=${DIR_CACHE}/${URL_OFFERINDEX#https://}
+  
+  jq -r '.versions | keys[] ' < "$FILE_OFFERINDEX" | sort
+}
+
+function pullAwsOfferAllVersions {
+  local AWS_OFFER=$1
+  cacheRefreshMasterIndex
+
+  URL_OFFERINDEX=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json
+  FILE_OFFERINDEX=${DIR_CACHE}/${URL_OFFERINDEX#https://}
+  #echo $URL_OFFERINDEX
+  #echo $FILE_OFFERINDEX
+  
+  cacheAndValidate $URL_OFFERINDEX
+
+  if [ -f "$FILE_OFFERINDEX" ] ; then
+#    jq -r \
+#      --arg prefix "${AWS_FEEDURL_PREFIX}" \
+#      --arg offer "${AWS_OFFER}" \
+#      '.versions | keys[] | [$prefix+"/offers/v1.0/aws/"+$offer+"/"+.+"/index.json",$prefix+"/offers/v1.0/aws/"+$offer+"/"+.+"/region_index.json"] | .[]' \
+#    < "$FILE_OFFERINDEX" \
+#    | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
+
+
+#     jq -r '.versions | keys[] ' < "$FILE_OFFERINDEX" \
+#      | xargs -n 2 -P 0 -I {} echo ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/{}/region_index.json \
+#      | xargs -n 2 -P 0 -I {} curl -s {} \
+#      | jq -r '.regions[].currentVersionUrl'  \
+#      | xargs -n 2 -P 0 -I {} echo ${AWS_FEEDURL_PREFIX}{} \
+#      | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}"
+
+     jq -r '.versions | keys[] ' < "$FILE_OFFERINDEX" \
+      | xargs -n 2 -P 0 -I {} echo ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/{}/index.json \
+      | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}" 
+
+     jq -r '.versions | keys[] ' < "$FILE_OFFERINDEX" \
+      | xargs -n 2 -P 0 -I {} echo ${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/{}/region_index.json \
+      | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}" 
+
+     find ${DIR_CACHE}/${AWS_FEEDURL_PREFIX#https://}/offers/v1.0/aws/${AWS_OFFER} -name region_index.json \
+      | xargs -n 2 -P 0 -I {} cat {} \
+      | jq -r --arg prefix "${AWS_FEEDURL_PREFIX}" '.regions[] | $prefix+.currentVersionUrl' \
+      | xargs -n 2 -P 0 -I {} bash -c "cacheAndValidate {}" 
+
+#   
+  fi
+
 }
 
 

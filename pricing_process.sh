@@ -89,6 +89,25 @@ function processAndLoadOfferVersion {
     mergestaging2main
 }
 
+function processAndLoadOfferVersions {
+  local AWS_OFFER=$1
+  if [[ "$#" -lt 1 ]]; then
+    echo "processAndLoadOfferVersion : Illegal number ($#) of parameters" ; return
+  fi
+
+  #listAwsOfferVersions ${AWS_OFFER} \
+  # | xargs  -n 2 -P 0 -I {} bash -c "pullAwsOfferVersion ${AWS_OFFER} {}"
+  for VERSION in $(listAwsOfferVersions ${AWS_OFFER})  
+  do
+    pullAwsOfferVersion $AWS_OFFER $VERSION
+    preprocessOfferdata $AWS_OFFER $VERSION
+  done 
+  _concatOfferFiles $AWS_OFFER
+  _load2BqStaging
+  mergestaging2main
+
+}
+
 
 function processAndLoadCurrentAll {
     if [ ! -f "${LOCAL_INDEX}" ] ; then (echo "$LOCAL_INDEX does not exist" ; return) ; fi
