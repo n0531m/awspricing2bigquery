@@ -36,11 +36,11 @@ export DIR_OUT_CONCAT=${DIR_PROCESSED}/concat
 #### Data source (AWS) related
 
 #### DO NOT CHANGE
-AWS_FEEDURL_PREFIX=https://pricing.us-east-1.amazonaws.com
-AWS_FEEDURL_INDEX=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/index.json
+export AWS_FEEDURL_PREFIX=https://pricing.us-east-1.amazonaws.com
+export AWS_FEEDURL_INDEX=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/index.json
 
 #### DO NOT CHANGE
-LOCAL_INDEX=${DIR_CACHE}/${AWS_FEEDURL_INDEX#https://}
+export LOCAL_INDEX=${DIR_CACHE}/${AWS_FEEDURL_INDEX#https://}
 if [ ! -d ${LOCAL_INDEX%/*} ] ; then mkdir -p ${LOCAL_INDEX%/*} ; fi
 
 
