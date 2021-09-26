@@ -53,3 +53,10 @@ function createAwsFullVersionIndexDownloadTsv {
 
   #gsutil cp -c $FILE_OUTPUT gs://moritani-pricebook-transferservice-sink-asia/lists/fullVersionIndexlist_sorted.txt
 }
+
+function setupSTS {
+  bq mk --transfer_config --target_dataset=dataset --display_name=name
+                           -p='{"param":"value"}' --data_source=source
+                           --schedule_start_time={schedule_start_time}
+                           --schedule_end_time={schedule_end_time}
+}

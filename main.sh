@@ -65,7 +65,7 @@ BQ_TABLE_PREFIX=aws_offers
 #### GCP Transfer service
 #### CHANGE AS NEEDED
 
-BUCKET_STS_SINK=
+BUCKET_STS_SINK=moritani-pricebook-transferservice-sink-asia
 
 
 
