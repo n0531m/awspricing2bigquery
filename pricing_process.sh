@@ -44,27 +44,27 @@ function _concatFiles {
     for FILE in $(find ${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws -name products2.jsonl | sort)
     do
         cat "${FILE}"
-    done > ${DIR_OUT_CONCAT}/aws_products.jsonl
+    done > "${DIR_OUT_CONCAT}/aws_products.jsonl"
     
     for FILE in $(find ${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws -name terms2.jsonl | sort)
     do
         cat "${FILE}"
-    done > ${DIR_OUT_CONCAT}/aws_terms.jsonl
+    done > "${DIR_OUT_CONCAT}/aws_terms.jsonl"
 }
 function _concatOfferFiles {
     local AWS_OFFER=$1
     
     if [ ! -d "$DIR_OUT_CONCAT" ]; then mkdir -p "${DIR_OUT_CONCAT}" ; fi
     
-    for FILE in $(find ${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER} -name products2.jsonl | sort)
+    for FILE in $(find "${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER}" -name products2.jsonl | sort)
     do
         cat "${FILE}"
-    done > ${DIR_OUT_CONCAT}/aws_products.jsonl
+    done > "${DIR_OUT_CONCAT}/aws_products.jsonl"
     
     for FILE in $(find ${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER} -name terms2.jsonl | sort)
     do
         cat "${FILE}"
-    done > ${DIR_OUT_CONCAT}/aws_terms.jsonl
+    done > "${DIR_OUT_CONCAT}/aws_terms.jsonl"
 }
 
 function processAndLoadOfferVersion {
@@ -82,9 +82,9 @@ function processAndLoadOfferVersion {
     #  echo "processAndLoadOfferVersion : Illegal number of parameters"; return
     #fi
     
-    pullAwsOfferVersion $AWS_OFFER $VERSION
-    preprocessOfferdata $AWS_OFFER $VERSION
-    _concatOfferFiles $AWS_OFFER
+    pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
+    preprocessOfferdata "$AWS_OFFER" "$VERSION"
+    _concatOfferFiles "$AWS_OFFER"
     _load2BqStaging
     mergestaging2main
 }
@@ -99,10 +99,10 @@ function processAndLoadOfferVersions {
   # | xargs  -n 2 -P 0 -I {} bash -c "pullAwsOfferVersion ${AWS_OFFER} {}"
   for VERSION in $(listAwsOfferVersions ${AWS_OFFER})  
   do
-    pullAwsOfferVersion $AWS_OFFER $VERSION
-    preprocessOfferdata $AWS_OFFER $VERSION
+    pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
+    preprocessOfferdata "$AWS_OFFER" "$VERSION"
   done 
-  _concatOfferFiles $AWS_OFFER
+  _concatOfferFiles "$AWS_OFFER"
   _load2BqStaging
   mergestaging2main
 
@@ -120,8 +120,8 @@ function processAndLoadCurrentAll {
 
 function _load2BqStaging {
     
-    bq --project_id ${BQ_PROJECT} show ${BQ_DATASET_STAGING} \
-    || bq --project_id ${BQ_PROJECT} mk -d --data_location ${REGION} ${BQ_DATASET_STAGING}
+    bq --project_id "${BQ_PROJECT}" show "${BQ_DATASET_STAGING}" \
+    || bq --project_id "${BQ_PROJECT}" mk -d --data_location "${REGION}" "${BQ_DATASET_STAGING}"
     
     
     ### upload files to GCS
@@ -129,7 +129,7 @@ function _load2BqStaging {
     local GCS_PATH_PRODUCTS=${GCS_PATH}/aws_products.jsonl
     local GCS_PATH_TERMS=${GCS_PATH}/aws_terms.jsonl
     
-    gsutil -m -o GSUtil:parallel_process_count=1 rsync -r -J ${DIR_OUT_CONCAT} ${GCS_PATH}
+    gsutil -m -o GSUtil:parallel_process_count=1 rsync -r -J "${DIR_OUT_CONCAT}" "${GCS_PATH}"
     
     
     ### load products/terms into a BigQuery table each
@@ -141,14 +141,19 @@ function _load2BqStaging {
     
     local BQ_LOAD_OPTIONS="--max_bad_records 10000 --replace --source_format NEWLINE_DELIMITED_JSON"
     
-    bq --project_id ${BQ_PROJECT} load ${BQ_LOAD_OPTIONS} --clustering_fields sku ${TABLE_PRODUCTS} ${GCS_PATH_PRODUCTS} ${SCHEMA_PRODUCTS}
-    bq --project_id ${BQ_PROJECT} load ${BQ_LOAD_OPTIONS} --clustering_fields sku ${TABLE_TERMS}    ${GCS_PATH_TERMS}    ${SCHEMA_TERMS}
+    bq --project_id "${BQ_PROJECT}" \
+       load ${BQ_LOAD_OPTIONS} --clustering_fields sku \
+       "${TABLE_PRODUCTS}" "${GCS_PATH_PRODUCTS}" "${SCHEMA_PRODUCTS}"
+    
+    bq --project_id "${BQ_PROJECT}" \
+       load ${BQ_LOAD_OPTIONS} --clustering_fields sku \
+       "${TABLE_TERMS}"    "${GCS_PATH_TERMS}"   "${SCHEMA_TERMS}"
     
     
     ### joining the terms table and product table into a single offer table
     
     local FILE_SQL=${DIR_SQL}/aws_offer_join_terms_and_products.sql
-  cat > ${FILE_SQL} <<- EOF
+  cat > "${FILE_SQL}" <<- EOF
     CREATE OR REPLACE TABLE \`${BQ_PROJECT}.${BQ_DATASET_STAGING}.${BQ_TABLE_PREFIX}\`
     CLUSTER BY sku, version AS (
       SELECT *
@@ -157,13 +162,13 @@ function _load2BqStaging {
       USING (sku, version)
     )
 EOF
-    cat ${FILE_SQL} | bq --project_id ${BQ_PROJECT} query --nouse_legacy_sql
+    cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" query --nouse_legacy_sql
 }
 
 function mergestaging2main {
     
     local FILE_SQL=${DIR_SQL}/aws_offer_merge.sql
-  cat > ${FILE_SQL} <<- EOF
+  cat > "${FILE_SQL}" <<- EOF
     MERGE INTO \`${BQ_PROJECT}.${BQ_DATASET}.${BQ_TABLE_PREFIX}\` T
     USING \`${BQ_PROJECT}.${BQ_DATASET_STAGING}.${BQ_TABLE_PREFIX}\` S
     ON  T.sku = S.sku
