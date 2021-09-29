@@ -25,14 +25,14 @@ function cacheContentByUrl {
     #echo cacheContentByUrl $URL
     #echo cacheContentByUrl $FILE
     
-    wget -N -q -P "${DIR_CACHE}" -x "${URL}" && echo "${URL} : cached"
+    wget -N -q -P "${DIR_CACHE}" -x "${URL}" && echo "${URL} : cached" >&2 
     #curl -s --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
     #  curl -s -C - --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
     if [ ! -s "${FILE}" ] ; then
-        sleep 2;  wget -N -q -P "${DIR_CACHE}" -x "${URL}" && echo "${URL} : cached"
+        sleep 2;  wget -N -q -P "${DIR_CACHE}" -x "${URL}" && echo "${URL} : cached" >&2
         #sleep 2;  curl -s --output-dir ${DIR_CACHE} --create-dirs -o ${URL#https://} $URL && echo "${URL} : cached"
         if [ ! -s "${FILE}" ] ; then
-            echo "failed to fetch header for $URL"
+            echo "failed to fetch header for $URL" >&2
         fi
     fi
 }
@@ -59,6 +59,10 @@ function cacheHeaderByUrl {
 }
 export -f cacheHeaderByUrl
 
+function listOfferCodes {
+    cacheRefreshMasterIndex
+    cat "${LOCAL_INDEX}" | jq -r '.offers[] | .offerCode' | sort
+}
 ## capture index file
 function pullAwsVersionIndexes {
     
@@ -183,22 +187,24 @@ function pullAwsOfferVersion {
     local AWS_OFFER=$1
     local VERSION=current
     if [[ "$#" == 0 ]]; then
-        echo "pullAwsOfferVersion : Illegal number ($#) of parameters" ; return
+        echo "pullAwsOfferVersion : Illegal number ($#) of parameters" >&2 ; return
         elif [[ "$#" == 2 ]]; then
         VERSION=$2
         elif [[ "$#" -gt 2 ]]; then
-        echo "pullAwsOfferVersion : Illegal number (\"$#\") of parameters" ; return
+        echo "pullAwsOfferVersion : Illegal number (\"$#\") of parameters" >&2 ; return
     fi
     cacheAndValidate "${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/${VERSION}/index.json"
 }
 export -f pullAwsOfferVersion
 
-function listAwsOfferVersions {
-  local AWS_OFFER=$1
+function listOfferVersionsAWS {
   if [[ "$#" != 1 ]]; then
-    echo "listAwsOfferVersions : Illegal number ($#) of parameters"
-    echo -e "\tusage : listAwsOfferVersions <AWS_OFFER>" ; return
+    echo "listOfferVersionsAWS : Illegal number ($#) of parameters" >&2
+    echo -e "\tusage : listAwsOfferVersions <AWS_OFFER>" >&2 ; return
   fi
+
+  local AWS_OFFER=$1
+
   cacheRefreshMasterIndex
 
   URL_OFFERINDEX=${AWS_FEEDURL_PREFIX}/offers/v1.0/aws/${AWS_OFFER}/index.json

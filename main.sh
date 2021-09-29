@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 #### Loading scripts
 #### DO NOT CHANGE
@@ -47,25 +47,25 @@ if [ ! -d ${LOCAL_INDEX%/*} ] ; then mkdir -p ${LOCAL_INDEX%/*} ; fi
 #### GCP Environment related
 #### CHANGE AS NEEDED
 
-GCP_PROJECTNAME=$(gcloud config list  --format="value(core.project)")
+export GCP_PROJECTNAME=$(gcloud config list  --format="value(core.project)")
 #echo GCP_PROJECTNAME:"${GCP_PROJECTNAME}"
 
-REGION=asia-southeast1
+export REGION=asia-southeast1
 
-BUCKET=moritani-pricebook-asia-southeast1
-BUCKET_WORK=moritani-pricebook-asia-southeast1
+export BUCKET=moritani-pricebook-asia-southeast1
+export BUCKET_WORK=moritani-pricebook-asia-southeast1
 
-BQ_PROJECT=${GCP_PROJECTNAME}
-BQ_DATASET=aws_pricing
-BQ_DATASET_STAGING=aws_pricing_staging
-BQ_TABLE_PREFIX=aws_offers
+export BQ_PROJECT=${GCP_PROJECTNAME}
+export BQ_DATASET=aws_pricing
+export BQ_DATASET_STAGING=aws_pricing_staging
+export BQ_TABLE_PREFIX=aws_offers
 
 
 
 #### GCP Transfer service
 #### CHANGE AS NEEDED
 
-BUCKET_STS_SINK=moritani-pricebook-transferservice-sink-asia
+export BUCKET_STS_SINK=moritani-pricebook-transferservice-sink-asia
 
 
 
@@ -83,20 +83,24 @@ function usage {
   echo $0 pullAwsVersionIndexes
   echo $0 pullAwsVersionIndexesFull
   echo $0 pullAwsSavingsPlanVersionIndexes
-  echo $0 pullAwsOfferVersion "<OFFER>"
-  echo $0 pullAwsOfferVersion "<OFFER>" "<VERSION>"
+  echo $0 pullAwsOfferVersion        "<OFFER>"
+  echo $0 pullAwsOfferVersion        "<OFFER>" "<VERSION>"
   echo $0 pullCurrentOffers
   echo $0 pullLatestOffers
 
-  echo $0 preprocessOfferdata "<OFFER>" "<VERSION>"
+  echo $0 preprocessOfferdata        "<OFFER>" "<VERSION>"
   echo $0 processAndLoadCurrentAll
   echo $0 processAndLoadOfferVersion "<OFFER>"
   echo $0 processAndLoadOfferVersion "<OFFER>" "<VERSION>"
+  echo $0 processAndLoadOfferVersions "<OFFER>"
   echo $0 mergestaging2main
   echo $0 createOfferTable
   echo $0 recreateOfferTable
 
   echo $0 cacheAndValidate "<URL>"
+  echo $0 listOfferVersionsAWS "<OFFER>"
+  echo $0 listOfferVersionsBQ  "<OFFER>"
+  echo $0 compareOfferVersions "<OFFER>"
   
   echo $0 createAwsOffersCurrentVersionUrlList
   echo $0 createAwsOffersLatestVersionUrlList
@@ -104,3 +108,7 @@ function usage {
 }
 
 "$@"
+
+if [[ "$#" == 0 ]]; then
+ usage
+fi
