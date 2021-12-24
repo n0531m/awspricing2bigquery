@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash -v
 
 #### Loading scripts
 #### DO NOT CHANGE
@@ -30,6 +30,26 @@ if [ ! -d ${DIR_TEMP}       ] ; then mkdir -p ${DIR_TEMP}       ; fi
 
 if [ ! -d ${DIR_OUT_CONCAT} ] ; then mkdir -p ${DIR_OUT_CONCAT} ; fi
 export DIR_OUT_CONCAT=${DIR_PROCESSED}/concat
+
+## aws feeds will be cached in local directory $DIR_CACHE
+## url structure of all feeds are preserved so that I don't have to think of unique file names
+
+
+function clearCache {
+    if [ -d "${DIR_CACHE}" ] ; then
+        rm -rf "${DIR_CACHE}"/*
+    fi
+}
+function clearHeaders {
+    if [ -d "${DIR_HEADERS}" ] ; then
+        rm -rf "${DIR_HEADERS}"/*
+    fi
+}
+function clearProcessed {
+    if [ -d "${DIR_PROCESSED}" ] ; then
+        rm -rf "${DIR_PROCESSED}"/*
+    fi
+}
 
 
 
@@ -80,18 +100,17 @@ function usage {
   echo $0 cacheRefreshMasterIndex
   echo $0 clearCache
   echo $0 clearHeaders
+  echo $0 clearProcessed
   echo $0 pullAwsVersionIndexes
   echo $0 pullAwsVersionIndexesFull
   echo $0 pullAwsSavingsPlanVersionIndexes
-  echo $0 pullAwsOfferVersion        "<OFFER>"
-  echo $0 pullAwsOfferVersion        "<OFFER>" "<VERSION>"
+  echo $0 pullAwsOfferVersion         "<OFFER>" "[<VERSION>]"
   echo $0 pullCurrentOffers
   echo $0 pullLatestOffers
 
-  echo $0 preprocessOfferdata        "<OFFER>" "<VERSION>"
+  echo $0 preprocessOfferdata         "<OFFER>" "<VERSION>"
   echo $0 processAndLoadCurrentAll
-  echo $0 processAndLoadOfferVersion "<OFFER>"
-  echo $0 processAndLoadOfferVersion "<OFFER>" "<VERSION>"
+  echo $0 processAndLoadOfferVersion  "<OFFER>" "[<VERSION>]"
   echo $0 processAndLoadOfferVersions "<OFFER>"
   echo $0 mergestaging2main
   echo $0 createOfferTable
@@ -99,8 +118,9 @@ function usage {
 
   echo $0 cacheAndValidate "<URL>"
   echo $0 listOfferVersionsAWS "<OFFER>"
-  echo $0 listOfferVersionsBQ  "<OFFER>"
+  echo $0 listOfferVersionsBQ  "[<OFFER>]"
   echo $0 compareOfferVersions "<OFFER>"
+  echo $0 listOfferVersionsMissingInBQ "<OFFER>"
   
   echo $0 createAwsOffersCurrentVersionUrlList
   echo $0 createAwsOffersLatestVersionUrlList

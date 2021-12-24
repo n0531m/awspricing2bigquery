@@ -1,19 +1,6 @@
-#!/bin/bash -v
-
-## aws feeds will be cached in local directory $DIR_CACHE
-## url structure of all feeds are preserved so that I don't have to think of unique file names
+#!/bin/bash 
 
 
-function clearCache {
-    if [ -d "${DIR_CACHE}" ] ; then
-        rm -rf "${DIR_CACHE}"/*
-    fi
-}
-function clearHeaders {
-    if [ -d "${DIR_HEADERS}" ] ; then
-        rm -rf "${DIR_HEADERS}"/*
-    fi
-}
 function cacheRefreshMasterIndex {
     cacheAndValidate "${AWS_FEEDURL_INDEX}"
 }
@@ -150,7 +137,7 @@ function cacheAndValidate {
           echo "${URL}" >&2
           rm "$FILE"
           cacheContentByUrl "${URL}"
-          elif [[ ! ${local_md5} == ${ETag} ]] ; then
+          elif [[ ! ${local_md5} == "${ETag}" ]] ; then
           echo "cacheAndValidate : file md5 hash does not match ETag. actual : ${local_md5}, expected : ${ETag}. re-download" >&2
           echo "${URL}" >&2
           #curl -I ${URL}

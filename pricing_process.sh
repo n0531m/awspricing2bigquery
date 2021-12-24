@@ -1,4 +1,4 @@
-#!/bin/bash -v
+#!/bin/bash
 
 function preprocessOfferdata {
     local AWS_OFFER=$1
@@ -59,20 +59,22 @@ function _concatFiles {
         cat "${FILE}"
     done > "${DIR_OUT_CONCAT}/aws_terms.jsonl"
 }
+
+
 function _concatOfferFiles {
     local AWS_OFFER=$1
     
-    if [ ! -d "$DIR_OUT_CONCAT" ]; then mkdir -p "${DIR_OUT_CONCAT}" ; fi
+    if [ ! -d "$DIR_OUT_CONCAT/${AWS_OFFER}" ]; then mkdir -p "${DIR_OUT_CONCAT}/${AWS_OFFER}" ; fi
     
     for FILE in $(find "${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER}" -name products2.jsonl | sort)
     do
         cat "${FILE}"
-    done > "${DIR_OUT_CONCAT}/aws_products.jsonl"
+    done > "${DIR_OUT_CONCAT}/${AWS_OFFER}/aws_products.jsonl"
     
     for FILE in $(find ${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER} -name terms2.jsonl | sort)
     do
         cat "${FILE}"
-    done > "${DIR_OUT_CONCAT}/aws_terms.jsonl"
+    done > "${DIR_OUT_CONCAT}/${AWS_OFFER}/aws_terms.jsonl"
 }
 
 function processAndLoadOfferVersion {
@@ -93,7 +95,7 @@ function processAndLoadOfferVersion {
     pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
     preprocessOfferdata "$AWS_OFFER" "$VERSION"
     _concatOfferFiles "$AWS_OFFER"
-    _load2BqStaging
+    _load2BqStaging "$AWS_OFFER"
     mergestaging2main
 }
 
@@ -105,17 +107,42 @@ function processAndLoadOfferVersions {
 
   #listAwsOfferVersions ${AWS_OFFER} \
   # | xargs  -n 2 -P 0 -I {} bash -c "pullAwsOfferVersion ${AWS_OFFER} {}"
-  for VERSION in $(listOfferVersionsAWS ${AWS_OFFER})  
-  do
-    pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
-    preprocessOfferdata "$AWS_OFFER" "$VERSION"
-  done 
-  _concatOfferFiles "$AWS_OFFER"
-  _load2BqStaging
-  mergestaging2main
-
+  if [ $AWS_OFFER = "AmazonEC2" ]; then
+    listOfferVersionsMissingInBQ ${AWS_OFFER}
+    for VERSION in $(listOfferVersionsMissingInBQ ${AWS_OFFER})  
+    do
+      pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
+      preprocessOfferdata "$AWS_OFFER" "$VERSION"
+      _concatOfferFiles "$AWS_OFFER"
+      _load2BqStaging "$AWS_OFFER"
+      mergestaging2main
+      rm -rf "${DIR_PROCESSED}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER}/*"
+      rm -rf "${DIR_CACHE}/pricing.us-east-1.amazonaws.com/offers/v1.0/aws/${AWS_OFFER}/${VERSION}"
+    done 
+  else
+    listOfferVersionsMissingInBQ ${AWS_OFFER}
+    if [ "$(listOfferVersionsMissingInBQ ${AWS_OFFER} | wc -l)" -gt 0 ]
+      then
+      for VERSION in $(listOfferVersionsMissingInBQ ${AWS_OFFER})  
+      do
+        pullAwsOfferVersion "$AWS_OFFER" "$VERSION"
+        preprocessOfferdata "$AWS_OFFER" "$VERSION"
+      done 
+      _concatOfferFiles "$AWS_OFFER"
+      _load2BqStaging "$AWS_OFFER"
+      mergestaging2main
+    fi
+  fi
 }
 
+function processAndLoadAll {
+  for AWS_OFFER in $(listOfferCodes) 
+  do
+    if [[ $AWS_OFFER != "AmazonEC2" ]] ; then
+    processAndLoadOfferVersions ${AWS_OFFER}
+    fi
+  done
+}
 
 function processAndLoadCurrentAll {
     if [ ! -f "${LOCAL_INDEX}" ] ; then (echo "$LOCAL_INDEX does not exist" ; return) ; fi
@@ -127,17 +154,24 @@ function processAndLoadCurrentAll {
 }
 
 function _load2BqStaging {
-    
-    bq --project_id "${BQ_PROJECT}" show "${BQ_DATASET_STAGING}" \
+    echo _load2BqStaging
+    local AWS_OFFER=""
+    if [[ "$#" == 1 ]]; then
+      AWS_OFFER=$1
+    else 
+      echo "processAndLoadOfferVersion : Illegal number ($#) of parameters" ; return
+    fi
+    echo AWS_OFFER=$AWS_OFFER
+    bq --format=prettyjson --project_id "${BQ_PROJECT}" show "${BQ_DATASET_STAGING}" \
     || bq --project_id "${BQ_PROJECT}" mk -d --data_location "${REGION}" "${BQ_DATASET_STAGING}"
     
     
     ### upload files to GCS
-    local GCS_PATH=gs://${BUCKET_WORK}/processed/concat
+    local GCS_PATH=gs://${BUCKET_WORK}/processed/concat/${AWS_OFFER}
     local GCS_PATH_PRODUCTS=${GCS_PATH}/aws_products.jsonl
     local GCS_PATH_TERMS=${GCS_PATH}/aws_terms.jsonl
     
-    gsutil -m -o GSUtil:parallel_process_count=1 rsync -r -J "${DIR_OUT_CONCAT}" "${GCS_PATH}"
+    gsutil -m -o GSUtil:parallel_process_count=1 rsync -r -J "${DIR_OUT_CONCAT}/${AWS_OFFER}" "${GCS_PATH}"
     
     
     ### load products/terms into a BigQuery table each
@@ -154,14 +188,14 @@ function _load2BqStaging {
        "${TABLE_PRODUCTS}" "${GCS_PATH_PRODUCTS}" "${SCHEMA_PRODUCTS}"
     
     bq --format=prettyjson --project_id "${BQ_PROJECT}" show "${TABLE_PRODUCTS}" \
-      > ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}_products.json
+      | tee ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}_products.json | jq '. | del(.schema)'
 
     bq --project_id "${BQ_PROJECT}" \
        load ${BQ_LOAD_OPTIONS} --clustering_fields sku \
        "${TABLE_TERMS}"    "${GCS_PATH_TERMS}"   "${SCHEMA_TERMS}"
     
     bq --format=prettyjson --project_id "${BQ_PROJECT}" show "${TABLE_TERMS}" \
-      > ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}_terms.json 
+      | tee ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}_terms.json | jq '. | del(.schema)'
     
     ### joining the terms table and product table into a single offer table
     
@@ -176,9 +210,8 @@ function _load2BqStaging {
     )
 EOF
     cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" query --nouse_legacy_sql
-
-    bq --project_id "${BQ_PROJECT}" show "${BQ_DATASET_STAGING}.${BQ_TABLE_PREFIX}" \
-      > ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}.json 
+    bq --format=prettyjson --project_id "${BQ_PROJECT}" show "${BQ_DATASET_STAGING}.${BQ_TABLE_PREFIX}" \
+      | tee ${DIR_TEMP}/meta_table_${BQ_DATASET_STAGING}_${BQ_TABLE_PREFIX}.json | jq '. | del(.schema)'
 }
 
 function mergestaging2main {
@@ -204,7 +237,7 @@ function createOfferTable {
     --description "AWS Pricing table. combined key : sku,version,offerTermCode" \
     --label owner:moritani \
     --label cloud:aws \
-    --clustering_fields servicecode,version \
+    --clustering_fields servicecode,version,sku,offerTermCode \
     ${BQ_TABLE_PREFIX} \
     ${DIR_SCHEMA}/aws_offer_schema.json
 }
@@ -215,13 +248,13 @@ function recreateOfferTable {
 }
 function updateOfferTable {
     bq --project_id ${BQ_PROJECT} \
-    update --clustering_fields servicecode,version,offerTermCode ${BQ_DATASET}.${BQ_TABLE_PREFIX}
+    update --clustering_fields servicecode,version,sku,offerTermCode ${BQ_DATASET}.${BQ_TABLE_PREFIX}
 }
 
 function listOfferVersionsBQ {
-        local AWS_OFFER=$1
-
-    local FILE_SQL=${DIR_SQL}/bq_aws_offer_versionlist.sql
+  if [[ "$#" == 1 ]]; then
+    local AWS_OFFER=$1
+    local FILE_SQL=${DIR_SQL}/bq_aws_offer_versionlist_${AWS_OFFER}.sql
   cat > "${FILE_SQL}" <<- EOF
   SELECT DISTINCT version
     FROM \`${BQ_PROJECT}.${BQ_DATASET}.${BQ_TABLE_PREFIX}\`
@@ -229,7 +262,36 @@ function listOfferVersionsBQ {
     ORDER BY version
 EOF
     cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" --format=json query --nouse_legacy_sql | jq -r .[].version
+  elif [[ "$#" == 0 ]]; then
+    local FILE_SQL=${DIR_SQL}/bq_aws_offer_versionlist.sql
+  cat > "${FILE_SQL}" <<- EOF
+  SELECT DISTINCT servicecode,version
+    FROM \`${BQ_PROJECT}.${BQ_DATASET}.${BQ_TABLE_PREFIX}\`
+    ORDER BY servicecode,version
+EOF
+    cat "${FILE_SQL}" | bq --project_id "${BQ_PROJECT}" --format=csv query --nouse_legacy_sql  --max_rows 10000
+
+
+  fi
+
 }
+
+function listOfferVersionsMissingInBQ {
+  if [[ "$#" == 0 ]]; then
+    for AWS_OFFER in $(listOfferCodes) 
+    do
+      listOfferVersionsMissingInBQ "${AWS_OFFER}"
+    done
+  elif [[ "$#" == 1 ]]; then
+    local AWS_OFFER=$1
+    listOfferVersionsAWS "$AWS_OFFER" > "$DIR_TEMP/offers_aws_${AWS_OFFER}.txt"
+    listOfferVersionsBQ "$AWS_OFFER"  > "$DIR_TEMP/offers_bq_${AWS_OFFER}.txt"
+    comm -13 "$DIR_TEMP/offers_bq_${AWS_OFFER}.txt" "$DIR_TEMP/offers_aws_${AWS_OFFER}.txt" | sort
+  else
+    echo "listOfferVersionsMissingInBQ : Illegal number ($#) of parameters" ; return
+  fi  
+}
+
 
 function compareOfferVersions {
   if [[ "$#" -lt 1 ]]; then
@@ -239,14 +301,15 @@ function compareOfferVersions {
   local AWS_OFFER=$1
 
     echo \#\#\# offer data - available from AWS \#\#\# 
-    listOfferVersionsAWS $AWS_OFFER | tee $DIR_TEMP/offers_aws_${AWS_OFFER}.txt
+    listOfferVersionsAWS "$AWS_OFFER" | tee $DIR_TEMP/offers_aws_${AWS_OFFER}.txt
     echo \#\#\# offer data - loaded on BigQuery \#\#\# 
-    listOfferVersionsBQ $AWS_OFFER  | tee $DIR_TEMP/offers_bq_${AWS_OFFER}.txt
+    listOfferVersionsBQ "$AWS_OFFER"  | tee $DIR_TEMP/offers_bq_${AWS_OFFER}.txt
 
     echo \#\#\# diff \<BQ\> \<AWS\>
     diff $DIR_TEMP/offers_bq_${AWS_OFFER}.txt $DIR_TEMP/offers_aws_${AWS_OFFER}.txt
     #> $DIR_TEMP/offers_bq_${AWS_OFFER}.txt
     #> $DIR_TEMP/offers_aws_${AWS_OFFER}.txt
-    echo \#\#\# compareOfferVersions done
+    echo \#\#\# compareOfferVersions completed
     
+    comm -23 $DIR_TEMP/offers_bq_${AWS_OFFER}.txt $DIR_TEMP/offers_aws_${AWS_OFFER}.txt
 }
